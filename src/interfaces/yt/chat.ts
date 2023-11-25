@@ -42,7 +42,7 @@ export interface YTEmoji {
   shortcuts: string[];
   searchTerms: string[];
   image: YTThumbnailList; // with accessibility
-  isCustomEmoji: boolean;
+  isCustomEmoji?: boolean;
 }
 
 export interface YTUrlEndpointContainer {
@@ -106,6 +106,17 @@ export interface YTActionResponse {
   responseContext: YTResponseContext;
   success: boolean;
   actions: YTAction[];
+  timeoutDurationUsec?: string;
+  errorMessage?: YTLiveChatTextActionsErrorMessageRenderer;
+}
+
+export interface YTLiveChatTextActionsErrorMessageRenderer {
+  errorText: YTRunContainer;
+  editMessageText: YTRunContainer;
+  clickToDismissText: YTRunContainer;
+  originalRichMessage: {
+    textSegments: YTTextRun[];
+  };
 }
 
 // Interfaces
@@ -189,7 +200,7 @@ export interface YTLiveChatNavigationEndpointContainer
   clickTrackingParams: string;
   showLiveChatParticipantsEndpoint?: YTSEndpoint;
   toggleLiveChatTimestampsEndpoint?: YTSEndpoint;
-  popoutLiveChatEndpoint?: YTPopoutLiveChatEndpoint;
+  popoutLiveChatEndpoint?: YTThumbnailWithoutSize;
   feedbackEndpoint?: YTFeedbackEndpoint;
   confirmDialogEndpoint?: YTConfirmDialogEndpoint;
 }
@@ -252,7 +263,10 @@ export type YTAddChatItemActionItem =
   | YTLiveChatMembershipItemRendererContainer
   | YTLiveChatPlaceholderItemRendererContainer
   | YTLiveChatViewerEngagementMessageRendererContainer
-  | YTLiveChatModeChangeMessageRendererContainer;
+  | YTLiveChatModeChangeMessageRendererContainer
+  | YTLiveChatSponsorshipsGiftPurchaseAnnouncementRendererContainer
+  | YTLiveChatSponsorshipsGiftRedemptionAnnouncementRendererContainer
+  | YTLiveChatModerationMessageRendererContainer;
 
 export interface YTAddLiveChatTickerItemAction {
   item: YTAddLiveChatTickerItem;
@@ -340,8 +354,25 @@ export interface YTLiveChatModeChangeMessageRendererContainer {
   liveChatModeChangeMessageRenderer: YTLiveChatModeChangeMessageRenderer;
 }
 
+// Only appeared in YTShowLiveChatActionPanelAction
 export interface YTLiveChatActionPanelRendererContainer {
   liveChatActionPanelRenderer: YTLiveChatActionPanelRenderer;
+}
+
+export interface YTLiveChatSponsorshipsGiftPurchaseAnnouncementRendererContainer {
+  liveChatSponsorshipsGiftPurchaseAnnouncementRenderer: YTLiveChatSponsorshipsGiftPurchaseAnnouncementRenderer;
+}
+
+export interface YTLiveChatSponsorshipsGiftRedemptionAnnouncementRendererContainer {
+  liveChatSponsorshipsGiftRedemptionAnnouncementRenderer: YTLiveChatSponsorshipsGiftRedemptionAnnouncementRenderer;
+}
+
+export interface YTLiveChatModerationMessageRendererContainer {
+  liveChatModerationMessageRenderer: YTLiveChatModerationMessageRenderer;
+}
+
+export interface YTLiveChatBannerRedirectRendererContainer {
+  liveChatBannerRedirectRenderer: YTLiveChatBannerRedirectRenderer;
 }
 
 // LiveChat Renderers
@@ -419,7 +450,7 @@ export interface YTLiveChatMembershipItemRenderer {
   headerSubtext: YTText;
   message?: YTRunContainer; // milestone with message
   empty?: true; // milestone without message
-  authorName: YTText;
+  authorName?: YTText;
   authorPhoto: YTThumbnailList;
   authorBadges: YTLiveChatAuthorBadgeRendererContainer[];
   contextMenuEndpoint: YTLiveChatItemContextMenuEndpointContainer;
@@ -434,8 +465,10 @@ export interface YTLiveChatPlaceholderItemRenderer {
 export interface YTLiveChatBannerRenderer {
   actionId: string;
   targetId: string; // live-chat-banner
-  contents: YTLiveChatTextMessageRendererContainer;
-  header: YTLiveChatBannerRendererHeader;
+  contents:
+    | YTLiveChatTextMessageRendererContainer
+    | YTLiveChatBannerRedirectRendererContainer;
+  header?: YTLiveChatBannerRendererHeader;
   viewerIsCreator: boolean;
 }
 
@@ -481,6 +514,28 @@ export interface YTLiveChatActionPanelRenderer {
   contents: YTLiveChatPollRendererContainer | any;
   id: string;
   targetId: string;
+}
+
+export interface YTLiveChatBannerRedirectRenderer {
+  /**
+   * "runs": [
+          {
+            "text": "Athena Nightingale【AkioAIR】",
+            "bold": true,
+            "textColor": 4294967295,
+            "fontFace": "FONT_FACE_ROBOTO_REGULAR"
+          },
+          {
+            "text": " and their viewers just joined. Say hello!",
+            "textColor": 4294967295,
+            "fontFace": "FONT_FACE_ROBOTO_REGULAR"
+          }
+        ]
+   */
+  bannerMessage: YTRunContainer<YTTextRun>;
+  authorPhoto: YTThumbnailList;
+  inlineActionButton: YTActionButtonRendererContainer;
+  contextMenuButton: YTContextMenuButtonRendererContainer;
 }
 
 export interface YTLiveChatPollChoice {
@@ -534,6 +589,71 @@ export interface YTLiveChatModeChangeMessageRenderer {
   subtext: YTText;
 }
 
+// Sponsorships gift purchase announcement
+export interface YTLiveChatSponsorshipsGiftPurchaseAnnouncementRenderer {
+  id: string;
+  /** will be undefined if its container is a ticker */
+  timestampUsec?: string;
+  authorExternalChannelId: string;
+  header: {
+    liveChatSponsorshipsHeaderRenderer: YTLiveChatSponsorshipsHeaderRenderer;
+  };
+}
+
+export interface YTLiveChatSponsorshipsHeaderRenderer {
+  authorName: YTSimpleTextContainer;
+  authorPhoto: YTThumbnailList;
+  primaryText: {
+    runs: [
+      { text: "Gifted "; bold: true },
+      { text: string; bold: true }, // text: "5"
+      { text: " "; bold: true },
+      { text: string; bold: true }, // text: "Miko Ch. さくらみこ"
+      { text: " memberships"; bold: true }
+    ];
+  };
+  authorBadges: YTLiveChatAuthorBadgeRendererContainer[];
+  contextMenuEndpoint: YTLiveChatItemContextMenuEndpointContainer;
+  contextMenuAccessibility: YTAccessibilityData;
+  image: YTThumbnailList; // https://www.gstatic.com/youtube/img/sponsorships/sponsorships_gift_purchase_announcement_artwork.png
+}
+
+// Sponsorships gift redemption announcement
+export interface YTLiveChatSponsorshipsGiftRedemptionAnnouncementRenderer {
+  id: string;
+  timestampUsec: string;
+  authorExternalChannelId: string;
+  authorName: YTSimpleTextContainer;
+  authorPhoto: YTThumbnailList;
+  message: {
+    runs: [
+      { text: "was gifted a membership by "; italics: true },
+      { text: string; bold: true; italics: true } // text: "User"
+    ];
+  };
+  contextMenuEndpoint: YTLiveChatItemContextMenuEndpointContainer;
+  contextMenuAccessibility: YTAccessibilityData;
+  trackingParams: string;
+}
+
+// Moderation message
+export interface YTLiveChatModerationMessageRenderer {
+  message: {
+    runs: [
+      { text: string; bold: true; italics: true },
+      {
+        // TODO: find other variants
+        text: " was hidden by " | " was unhidden by ";
+        italics: true;
+      },
+      { text: string; bold: true; italics: true },
+      { text: "."; italics: true }
+    ];
+  };
+  id: string;
+  timestampUsec: string;
+}
+
 // Ticker Renderers
 
 export interface YTAddLiveChatTickerItem {
@@ -571,13 +691,17 @@ export interface YTLiveChatTickerPaidStickerItemRenderer {
 
 export interface YTLiveChatTickerSponsorItemRenderer {
   id: string;
+  detailIcon?: { iconType: "GIFT" };
   detailText: YTText;
   detailTextColor: number;
   startBackgroundColor: number;
   endBackgroundColor: number;
   sponsorPhoto: YTThumbnailList;
   durationSec: number;
-  showItemEndpoint: YTShowLiveChatItemEndpointContainer<YTLiveChatMembershipItemRendererContainer>;
+  showItemEndpoint: YTShowLiveChatItemEndpointContainer<
+    | YTLiveChatMembershipItemRendererContainer
+    | YTLiveChatSponsorshipsGiftPurchaseAnnouncementRendererContainer
+  >;
   authorExternalChannelId: string;
   fullDurationSec: number;
 }
@@ -635,19 +759,11 @@ export interface YTInteractionMessage {
 
 export interface YTAuthorBadge {
   liveChatAuthorBadgeRenderer: {
-    customThumbnail?: YTCustomThumbnail;
+    customThumbnail?: YTThumbnailList;
     icon?: YTIcon;
     tooltip: string;
     accessibility: YTAccessibilityData;
   };
-}
-
-export interface YTCustomThumbnail {
-  thumbnails: YTPopoutLiveChatEndpoint[];
-}
-
-export interface YTPopoutLiveChatEndpoint {
-  url: string;
 }
 
 export interface YTSendLiveChatMessageEndpoint {
@@ -707,7 +823,7 @@ export interface YTApiEndpointMetadata {
 
 export interface YTPopoutLiveChatEndpointContainer {
   clickTrackingParams: string;
-  popoutLiveChatEndpoint: YTPopoutLiveChatEndpoint;
+  popoutLiveChatEndpoint: YTThumbnailWithoutSize;
 }
 
 export enum YTWebPageType {
@@ -781,8 +897,12 @@ export interface YTThumbnailList {
 
 export interface YTThumbnail {
   url: string;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
+}
+
+export interface YTThumbnailWithoutSize {
+  url: string;
 }
 
 export interface YTLiveChatBannerRendererHeader {

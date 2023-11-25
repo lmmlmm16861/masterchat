@@ -1,4 +1,3 @@
-import { OmitTrackingParams } from "../utils";
 import {
   Color,
   Membership,
@@ -7,19 +6,10 @@ import {
   SuperChatSignificance,
 } from "./misc";
 import {
-  YTLiveChatPaidMessageRendererContainer,
-  YTLiveChatPlaceholderItemRendererContainer,
   YTLiveChatPollChoice,
-  YTLiveChatPollRenderer,
   YTLiveChatPollType,
-  YTLiveChatTextMessageRendererContainer,
-  YTLiveChatTickerPaidStickerItemRenderer,
-  YTLiveChatTickerSponsorItemRenderer,
-  YTRemoveBannerForLiveChatCommand,
   YTRun,
   YTText,
-  YTTooltipRenderer,
-  YTType,
 } from "./yt/chat";
 
 /**
@@ -41,20 +31,31 @@ export type Action =
   | AddMembershipTickerAction
   | AddBannerAction
   | RemoveBannerAction
+  | AddRedirectBannerAction
   | AddViewerEngagementMessageAction
   | ShowPanelAction
   | ShowPollPanelAction
   | ClosePanelAction
   | UpdatePollAction
+  | AddPollResultAction
   | ShowTooltipAction
-  | ModeChangeAction;
+  | ModeChangeAction
+  | MembershipGiftPurchaseAction
+  | MembershipGiftRedemptionAction
+  | ModerationMessageAction;
 
 export interface AddChatItemAction {
   type: "addChatItemAction";
   id: string;
   timestamp: Date;
   timestampUsec: string;
-  message: YTRun[];
+  /**
+   * message can somehow be a blank (in quite rare occasion though).
+   * We've observed `message: {}` three or four times.
+   * In most cases just `action.message!` would works.
+   */
+  message?: YTRun[];
+  /** rare but can be undefined */
   authorName?: string;
   authorChannelId: string;
   authorPhoto: string;
@@ -65,7 +66,7 @@ export interface AddChatItemAction {
   contextMenuEndpointParams: string;
 
   /** @deprecated use `message` */
-  rawMessage: YTRun[];
+  rawMessage?: YTRun[];
 }
 
 export interface AddSuperChatItemAction {
@@ -73,7 +74,8 @@ export interface AddSuperChatItemAction {
   id: string;
   timestamp: Date;
   timestampUsec: string;
-  authorName: string;
+  /** rare but can be undefined */
+  authorName?: string;
   authorChannelId: string;
   authorPhoto: string;
   message: YTRun[] | null;
@@ -124,8 +126,11 @@ export interface AddMembershipItemAction {
   // `level` is only shown when there's multiple levels available
   level?: string;
 
-  membership: Membership;
-  authorName: string;
+  /** Sometimes customThumbnail is not available */
+  membership?: Membership;
+
+  /** rare but can be undefined */
+  authorName?: string;
   authorChannelId: string;
   authorPhoto: string;
 }
@@ -136,11 +141,13 @@ export interface AddMembershipMilestoneItemAction {
   timestamp: Date;
   timestampUsec: string;
 
-  // `level` is only shown when there's multiple levels available
+  /** `level` is only shown when there's multiple levels available */
   level?: string;
 
-  membership: Membership;
-  authorName: string;
+  /** Sometimes customThumbnail is not available */
+  membership?: Membership;
+
+  authorName?: string;
   authorChannelId: string;
   authorPhoto: string;
 
@@ -171,15 +178,16 @@ export interface ReplaceChatItemAction {
   type: "replaceChatItemAction";
   targetItemId: string;
   replacementItem:
-    | YTLiveChatPlaceholderItemRendererContainer
-    | YTLiveChatTextMessageRendererContainer
-    | YTLiveChatPaidMessageRendererContainer; // TODO: check if YTLiveChatPaidMessageRendererContainer will appear
+    | AddChatItemAction
+    | AddPlaceholderItemAction
+    | AddSuperChatItemAction;
 }
 
 export interface MarkChatItemAsDeletedAction {
   type: "markChatItemAsDeletedAction";
   retracted: boolean;
   targetId: string;
+  executor?: string;
   timestamp: Date;
 }
 
@@ -226,7 +234,12 @@ export interface AddMembershipTickerAction {
   durationSec: number;
   fullDurationSec: number;
   detailText: YTText;
-  contents: AddMembershipItemAction | AddMembershipMilestoneItemAction; // TODO: check if AddMembershipMilestoneItemAction is available
+  // TODO: check if AddMembershipMilestoneItemAction is actually appeared
+  // TODO: wrap normal actions with TickerContent type
+  contents:
+    | AddMembershipItemAction
+    | AddMembershipMilestoneItemAction
+    | MembershipGiftPurchaseTickerContent;
   detailTextColor: Color;
   startBackgroundColor: Color;
   endBackgroundColor: Color;
@@ -234,6 +247,8 @@ export interface AddMembershipTickerAction {
 
 export interface AddBannerAction {
   type: "addBannerAction";
+  actionId: string;
+  targetId: string;
   id: string;
   title: YTRun[];
   message: YTRun[];
@@ -246,12 +261,21 @@ export interface AddBannerAction {
   isOwner: boolean;
   isModerator: boolean;
   isVerified: boolean;
+  viewerIsCreator: boolean;
   contextMenuEndpointParams?: string;
 }
 
 export interface RemoveBannerAction {
   type: "removeBannerAction";
   targetActionId: string;
+}
+
+export interface AddRedirectBannerAction {
+  type: "addRedirectBannerAction";
+  actionId: string;
+  targetId: string;
+  authorName: string;
+  authorPhoto: string;
 }
 
 export interface ShowTooltipAction {
@@ -267,11 +291,10 @@ export interface ShowTooltipAction {
 export interface AddViewerEngagementMessageAction {
   type: "addViewerEngagementMessageAction";
   id: string;
-  messageType: "engagement" | "poll" | string;
   message: YTText;
   actionUrl?: string;
-  timestamp?: Date;
-  timestampUsec?: string;
+  timestamp: Date;
+  timestampUsec: string;
 }
 
 // generic action for unknown panel type
@@ -309,6 +332,19 @@ export interface UpdatePollAction {
   voteCount: number;
 }
 
+export interface AddPollResultAction {
+  type: "addPollResultAction";
+  id: string;
+  question?: YTRun[];
+  total: string;
+  choices: PollChoice[];
+}
+
+export interface PollChoice {
+  text: YTRun[];
+  votePercentage: string;
+}
+
 export enum LiveChatMode {
   MembersOnly = "MEMBERS_ONLY",
   Slow = "SLOW",
@@ -321,6 +357,44 @@ export interface ModeChangeAction {
   mode: LiveChatMode;
   enabled: boolean;
   description: string;
+}
+
+export interface MembershipGiftPurchaseAction {
+  type: "membershipGiftPurchaseAction";
+  id: string;
+  timestamp: Date;
+  timestampUsec: string;
+  channelName: string; // MEMO: is it limited for ¥500 membership?
+  amount: number; // 5, 10, 20
+  membership: Membership;
+  authorName: string;
+  authorChannelId: string;
+  authorPhoto: string;
+  image: string; // always https://www.gstatic.com/youtube/img/sponsorships/sponsorships_gift_purchase_announcement_artwork.png
+}
+
+export type MembershipGiftPurchaseTickerContent = Omit<
+  MembershipGiftPurchaseAction,
+  "timestamp" | "timestampUsec" | "type"
+>;
+
+export interface MembershipGiftRedemptionAction {
+  type: "membershipGiftRedemptionAction";
+  id: string;
+  timestamp: Date;
+  timestampUsec: string;
+  senderName: string; // author was gifted a membership by sender
+  authorName: string;
+  authorChannelId: string;
+  authorPhoto: string;
+}
+
+export interface ModerationMessageAction {
+  type: "moderationMessageAction";
+  id: string;
+  timestamp: Date;
+  timestampUsec: string;
+  message: YTRun[];
 }
 
 export interface UnknownAction {

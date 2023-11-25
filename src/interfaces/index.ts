@@ -1,8 +1,26 @@
+import { Action } from "./actions";
+import { TimedContinuation } from "./misc";
+
 export * from "./actions";
 export * from "./context";
 export * from "./contextActions";
 export * from "./misc";
+export * from "./transcript";
 export * from "./yt";
+
+export interface Metadata {
+  videoId: string;
+  channelId: string;
+  channelName?: string;
+  title?: string;
+  isLive?: boolean;
+}
+
+export interface ChatResponse {
+  actions: Action[];
+  continuation: TimedContinuation | undefined;
+  error: null;
+}
 
 export interface Credentials {
   SAPISID: string;

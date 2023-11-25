@@ -1,12 +1,12 @@
-import fetch from "cross-fetch";
+import axios from "axios";
 import { setupRecorder } from "nock-record";
 import { buildAuthHeaders } from "../auth";
 import { DH } from "../constants";
 import { findCfg, findInitialData } from ".";
 
-const id = process.env.MC_MSG_TEST_ID;
-const channelId = process.env.MC_MSG_TEST_CHANNEL_ID;
-const credentialsB64 = process.env.MC_MSG_TEST_CREDENTIALS_SECOND;
+const id = process.env.MC_TEST_VIDEO_ID;
+const channelId = process.env.MC_TEST_CHANNEL_ID;
+const credentialsB64 = process.env.MC_TEST_CREDENTIAL_2;
 const credentials = credentialsB64
   ? JSON.parse(Buffer.from(credentialsB64!, "base64").toString())
   : undefined;
@@ -24,13 +24,13 @@ describeif("watch", () => {
 
   beforeAll(async () => {
     const { completeRecording } = await record("watch");
-    const res = await fetch("https://www.youtube.com", {
+    const res = await axios.get("https://www.youtube.com", {
       headers: {
         ...DH,
         ...buildAuthHeaders(credentials),
       },
     });
-    watchHtml = await res.text();
+    watchHtml = res.data;
     completeRecording();
   });
 
